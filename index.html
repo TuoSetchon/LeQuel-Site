@@ -614,6 +614,14 @@
   }
   .form-save:hover{background:var(--rouge-dark);}
   .form-hint{font-size:11.5px;color:var(--encre-soft);margin-top:6px;}
+  .pay-options{display:flex;flex-direction:column;gap:10px;}
+  .pay-option{
+    display:flex;align-items:center;gap:10px;
+    border:1.5px solid var(--ligne);border-radius:12px;
+    padding:12px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .pay-option input{width:auto;flex-shrink:0;}
+  .pay-option:has(input:checked){border-color:var(--rouge);background:var(--creme);}
   .auth-tabs{display:flex;gap:6px;background:var(--creme);padding:4px;border-radius:12px;margin-bottom:18px;}
   .auth-tab{flex:1;padding:9px 0;border-radius:9px;font-size:13px;font-weight:700;color:var(--encre-soft);}
   .auth-tab.active{background:#fff;color:var(--encre);box-shadow:0 1px 4px rgba(0,0,0,.08);}
@@ -665,7 +673,7 @@
 </head>
 <body>
 
-<div class="topbar">Livraison à Abidjan &amp; à l'intérieur du pays · Paiement à la livraison disponible</div>
+<div class="topbar">Livraison à Abidjan &amp; à l'intérieur du pays · Paiement à la livraison ou en ligne (Orange Money, MTN, Moov, Wave, carte)</div>
 
 <header>
   <div class="header-row">
@@ -888,7 +896,7 @@
       </div>
       <div class="admin-table-wrap">
         <table class="admin-table">
-          <thead><tr><th>Commande</th><th>Client</th><th>Téléphone</th><th>Articles</th><th>Total</th><th>Statut</th><th>Date</th><th></th></tr></thead>
+          <thead><tr><th>Commande</th><th>Client</th><th>Téléphone</th><th>Articles</th><th>Total</th><th>Paiement</th><th>Statut</th><th>Date</th><th></th></tr></thead>
           <tbody id="adminOrdersBody"></tbody>
         </table>
       </div>
@@ -1025,10 +1033,38 @@
       <label>Adresse de livraison</label>
       <textarea id="coAddress" rows="2" placeholder="Quartier, ville, repère"></textarea>
     </div>
+    <div class="form-row">
+      <label>Mode de paiement</label>
+      <div class="pay-options">
+        <label class="pay-option">
+          <input type="radio" name="payMethod" value="cod" checked>
+          <span>Paiement à la livraison</span>
+        </label>
+        <label class="pay-option">
+          <input type="radio" name="payMethod" value="online">
+          <span>Payer maintenant en ligne (Orange Money, MTN, Moov, Wave, carte)</span>
+        </label>
+      </div>
+    </div>
+    <div class="admin-error" id="checkoutError"></div>
     <div class="form-actions">
       <button class="form-cancel" id="checkoutModalCancel">Annuler</button>
       <button class="form-save" id="checkoutModalConfirm">Confirmer la commande</button>
     </div>
+  </div>
+</div>
+
+<!-- Online payment pending modal -->
+<div class="modal-overlay" id="paymentPendingModal">
+  <div class="modal-box" style="text-align:center;">
+    <h3>Paiement en cours</h3>
+    <p style="font-size:13.5px;color:var(--encre-soft);margin:14px 0 22px;line-height:1.6;">
+      Une fenêtre de paiement CinetPay s'est ouverte dans un nouvel onglet. Choisissez votre moyen de paiement
+      (Orange Money, MTN, Moov, Wave, carte) et terminez la transaction, puis revenez ici.
+    </p>
+    <div id="paymentStatusLine" style="font-size:13.5px;font-weight:700;margin-bottom:18px;">En attente du paiement…</div>
+    <button class="form-save" id="paymentCheckNowBtn" style="width:100%;margin-bottom:10px;">J'ai terminé le paiement — Vérifier</button>
+    <button class="form-cancel" id="paymentPendingClose" style="width:100%;">Fermer</button>
   </div>
 </div>
 
@@ -1110,44 +1146,11 @@
 </div>
 
 <script>
-const PRODUCTS = [
-  {id:1,cat:'electronique',catLabel:'Électronique',name:'Écouteurs sans fil Pulse X',icon:'🎧',price:15000,old:19000,rating:4.6,reviews:128,badge:'promo',
-    desc:"Écouteurs intra-auriculaires avec réduction de bruit active et autonomie longue durée, pensés pour un usage quotidien en ville comme en déplacement.",
-    specs:[['Autonomie','28h avec boîtier'],['Connexion','Bluetooth 5.3'],['Étanchéité','IPX5'],['Garantie','12 mois']]},
-  {id:2,cat:'electronique',catLabel:'Électronique',name:'Montre connectée Aura',icon:'⌚',price:22000,old:28000,rating:4.7,reviews:64,badge:'promo',
-    desc:"Montre connectée avec suivi du rythme cardiaque, du sommeil et des activités sportives, compatible Android et iOS.",
-    specs:[['Écran','1.4" AMOLED'],['Autonomie','7 jours'],['Étanchéité','5 ATM'],['Garantie','12 mois']]},
-  {id:3,cat:'electronique',catLabel:'Électronique',name:'Batterie externe Volt 10000',icon:'🔋',price:9500,old:null,rating:4.5,reviews:203,badge:null,
-    desc:"Batterie externe compacte pour recharger votre téléphone plusieurs fois, avec double port de sortie.",
-    specs:[['Capacité','10 000 mAh'],['Ports','2x USB-A'],['Charge rapide','Oui'],['Garantie','6 mois']]},
-  {id:4,cat:'electronique',catLabel:'Électronique',name:'Mini four à air chaud',icon:'🍗',price:24000,old:29500,rating:4.8,reviews:41,badge:'promo',
-    desc:"Four à air chaud 8-en-1 pour cuire, griller et rôtir sans excès d'huile, capacité 12L idéale pour une petite famille.",
-    specs:[['Capacité','12 L'],['Puissance','1500 W'],['Programmes','8'],['Garantie','12 mois']]},
-  {id:5,cat:'mode',catLabel:'Mode',name:'Robe wax Adjoa',icon:'👗',price:12000,old:15000,rating:4.6,reviews:37,badge:'promo',
-    desc:"Robe en tissu wax authentique, coupe ajustée et manches courtes, confectionnée par des couturiers locaux.",
-    specs:[['Matière','Coton wax'],['Tailles','36 à 44'],['Entretien','Lavage main'],['Origine','Fabriqué en Côte d\'Ivoire']]},
-  {id:6,cat:'mode',catLabel:'Mode',name:'Baskets urbaines Zayo',icon:'👟',price:18000,old:null,rating:4.4,reviews:52,badge:'new',
-    desc:"Baskets légères et respirantes au design urbain, semelle amortissante pour un usage toute la journée.",
-    specs:[['Matière','Toile & caoutchouc'],['Pointures','39 à 45'],['Semelle','Amortissante'],['Garantie','3 mois']]},
-  {id:7,cat:'mode',catLabel:'Mode',name:'Sac à main tressé Nafi',icon:'👜',price:10500,old:13000,rating:4.5,reviews:29,badge:'promo',
-    desc:"Sac à main artisanal en raphia tressé, doublure intérieure avec poche zippée.",
-    specs:[['Matière','Raphia naturel'],['Dimensions','30x22x12 cm'],['Fermeture','Zip'],['Origine','Fait main']]},
-  {id:8,cat:'epicerie',catLabel:'Épicerie',name:'Panier d\'épices locales',icon:'🌶️',price:3500,old:null,rating:4.9,reviews:88,badge:null,
-    desc:"Assortiment de 6 épices et condiments traditionnels pour relever vos plats du quotidien.",
-    specs:[['Contenu','6 sachets'],['Origine','Produit local'],['Conservation','12 mois'],['Poids total','450 g']]},
-  {id:9,cat:'epicerie',catLabel:'Épicerie',name:'Huile de palme rouge 1L',icon:'🫙',price:2000,old:null,rating:4.7,reviews:156,badge:null,
-    desc:"Huile de palme rouge pure, pressée à froid, idéale pour la cuisine traditionnelle ivoirienne.",
-    specs:[['Volume','1 L'],['Type','Pression à froid'],['Origine','Côte d\'Ivoire'],['Conservation','6 mois']]},
-  {id:10,cat:'epicerie',catLabel:'Épicerie',name:'Riz parfumé premium 5kg',icon:'🍚',price:6500,old:7500,rating:4.8,reviews:97,badge:'promo',
-    desc:"Riz parfumé long grain, sélectionné pour sa qualité, en sac de 5 kg.",
-    specs:[['Poids','5 kg'],['Type','Long grain parfumé'],['Origine','Importé'],['Conservation','18 mois']]},
-  {id:11,cat:'maison',catLabel:'Maison',name:'Set de casseroles Cozy',icon:'🍲',price:16500,old:19500,rating:4.4,reviews:23,badge:'promo',
-    desc:"Set de 3 casseroles en aluminium avec revêtement antiadhésif, compatible tous feux sauf induction.",
-    specs:[['Pièces','3 casseroles'],['Revêtement','Antiadhésif'],['Poignées','Bakélite'],['Garantie','6 mois']]},
-  {id:12,cat:'maison',catLabel:'Maison',name:'Ventilateur de bureau QuickAir',icon:'🌀',price:8500,old:null,rating:4.3,reviews:19,badge:'new',
-    desc:"Ventilateur compact à 3 vitesses, silencieux, idéal pour bureau ou chevet.",
-    specs:[['Vitesses','3'],['Alimentation','Secteur'],['Bruit','≤55 dB'],['Garantie','6 mois']]},
-];
+const BACKEND_URL = 'https://lequel-backend.onrender.com';
+
+let PRODUCTS = [];
+let PROMO_CODES = [];
+let ORDERS = [];
 
 const fmt = n => 'FCFA ' + n.toLocaleString('fr-FR');
 
@@ -1155,10 +1158,6 @@ let cart = {}; // id -> qty
 let activeCat = 'tous';
 let pdpProduct = null;
 let pdpQty = 1;
-
-const PROMO_CODES = [
-  {code:'BIENVENUE10', value:10, active:true},
-];
 let appliedPromo = null;
 
 const ORDER_STAGES = [
@@ -1167,15 +1166,6 @@ const ORDER_STAGES = [
   {id:'expedie', label:'Expédiée'},
   {id:'livraison', label:'En livraison'},
   {id:'livree', label:'Livrée'},
-];
-let orderCounter = 1003;
-const ORDERS = [
-  {id:'CMD-1001', date:new Date(Date.now()-1000*60*60*26), customerName:'Aïcha Koné', customerPhone:'07 12 34 56 78', address:'Boundiali, quartier Résidentiel',
-    items:[{id:1,name:'Écouteurs sans fil Pulse X',qty:1,price:15000}], subtotal:15000, discount:0, total:15000, promoCode:null, stage:'livree'},
-  {id:'CMD-1002', date:new Date(Date.now()-1000*60*60*5), customerName:'Yao Kouassi', customerPhone:'05 98 76 54 32', address:'Korhogo-Soba',
-    items:[{id:4,name:'Mini four à air chaud',qty:1,price:24000},{id:9,name:'Huile de palme rouge 1L',qty:2,price:2000}], subtotal:28000, discount:2800, total:25200, promoCode:'BIENVENUE10', stage:'expedie'},
-  {id:'CMD-1003', date:new Date(Date.now()-1000*60*30), customerName:'Fatoumata Diallo', customerPhone:'01 45 67 89 01', address:'Abidjan, Cocody',
-    items:[{id:6,name:'Baskets urbaines Zayo',qty:1,price:18000}], subtotal:18000, discount:0, total:18000, promoCode:null, stage:'recue'},
 ];
 
 const grid = document.getElementById('productGrid');
@@ -1282,19 +1272,30 @@ function cartDiscount(){
 function cartFinalTotal(){
   return cartTotal() - cartDiscount();
 }
-function applyPromoCode(){
+async function applyPromoCode(){
   const input = document.getElementById('promoInput');
   const msg = document.getElementById('promoMsg');
   const code = input.value.trim().toUpperCase();
   if(!code){ msg.textContent=''; appliedPromo=null; updateCartUI(); return; }
-  const found = PROMO_CODES.find(p=>p.code.toUpperCase()===code && p.active);
-  if(found){
-    appliedPromo = found;
-    msg.textContent = `Code "${found.code}" appliqué : −${found.value}%`;
-    msg.style.color = '#1C7A3C';
-  }else{
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/promocodes/validate`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code}),
+    });
+    const data = await resp.json();
+    if(data.valid){
+      appliedPromo = {code:data.code, value:data.value};
+      msg.textContent = `Code "${data.code}" appliqué : −${data.value}%`;
+      msg.style.color = '#1C7A3C';
+    }else{
+      appliedPromo = null;
+      msg.textContent = 'Code promo invalide ou expiré';
+      msg.style.color = 'var(--rouge)';
+    }
+  }catch(err){
     appliedPromo = null;
-    msg.textContent = 'Code promo invalide ou expiré';
+    msg.textContent = "Impossible de vérifier le code pour l'instant.";
     msg.style.color = 'var(--rouge)';
   }
   updateCartUI();
@@ -1352,42 +1353,30 @@ document.getElementById('cartItems').addEventListener('click', e=>{
   if(rm){ delete cart[rm.dataset.rm]; updateCartUI(); }
 });
 
-document.getElementById('checkoutBtn').addEventListener('click', ()=>{
-  if(cartCount()===0) return;
-  document.getElementById('checkoutModal').classList.add('open');
-});
-document.getElementById('checkoutModalCancel').addEventListener('click', ()=>{
-  document.getElementById('checkoutModal').classList.remove('open');
-});
-document.getElementById('checkoutModalConfirm').addEventListener('click', ()=>{
-  const name = document.getElementById('coName').value.trim();
-  const phone = document.getElementById('coPhone').value.trim();
-  const address = document.getElementById('coAddress').value.trim();
-  if(!name || !phone){
-    alert('Merci de renseigner au moins votre nom et votre téléphone.');
-    return;
-  }
+async function finalizeOrder(name, phone, address, paymentMethod, paymentStatus){
   const items = Object.entries(cart).map(([id,qty])=>{
     const p = PRODUCTS.find(x=>x.id===Number(id));
     return {id:p.id, name:p.name, qty, price:p.price};
   });
-  orderCounter++;
-  ORDERS.unshift({
-    id:'CMD-' + orderCounter,
-    date:new Date(),
-    customerName:name,
-    customerPhone:phone,
-    address:address,
-    items,
-    subtotal:cartTotal(),
-    discount:cartDiscount(),
-    total:cartFinalTotal(),
-    promoCode:appliedPromo ? appliedPromo.code : null,
-    stage:'recue',
-  });
 
-  document.getElementById('checkoutModal').classList.remove('open');
-  showToast('Commande CMD-' + orderCounter + ' enregistrée — nous vous contactons bientôt');
+  const resp = await fetch(`${BACKEND_URL}/api/orders`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      customerName:name,
+      customerPhone:phone,
+      address,
+      items,
+      subtotal:cartTotal(),
+      discount:cartDiscount(),
+      total:cartFinalTotal(),
+      promoCode:appliedPromo ? appliedPromo.code : null,
+      paymentMethod,
+    }),
+  });
+  if(!resp.ok) throw new Error('Échec de la création de la commande.');
+  const order = await resp.json();
+
   cart = {};
   appliedPromo = null;
   document.getElementById('promoInput').value = '';
@@ -1397,6 +1386,136 @@ document.getElementById('checkoutModalConfirm').addEventListener('click', ()=>{
   document.getElementById('coAddress').value = '';
   updateCartUI();
   closeDrawer();
+  return order;
+}
+
+let paymentPollTimer = null;
+let paymentPollCount = 0;
+let currentPaymentTxn = null;
+
+function stopPaymentPolling(){
+  clearInterval(paymentPollTimer);
+  paymentPollTimer = null;
+  paymentPollCount = 0;
+}
+
+async function checkPaymentStatus(){
+  if(!currentPaymentTxn) return;
+  const statusLine = document.getElementById('paymentStatusLine');
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/payment/status/${currentPaymentTxn}`);
+    const data = await resp.json();
+    if(data.status === 'paid'){
+      stopPaymentPolling();
+      statusLine.textContent = '✅ Paiement confirmé !';
+      statusLine.style.color = '#1C7A3C';
+      showToast('Paiement confirmé — merci pour votre commande !');
+      setTimeout(()=>{
+        document.getElementById('paymentPendingModal').classList.remove('open');
+      }, 1800);
+    }else if(data.status === 'failed'){
+      stopPaymentPolling();
+      statusLine.textContent = '❌ Paiement refusé ou annulé.';
+      statusLine.style.color = 'var(--rouge)';
+    }else{
+      statusLine.textContent = 'En attente du paiement…';
+      statusLine.style.color = 'var(--encre-soft)';
+    }
+  }catch(err){
+    statusLine.textContent = "Impossible de vérifier le paiement pour l'instant.";
+    statusLine.style.color = 'var(--rouge)';
+  }
+}
+
+document.getElementById('paymentCheckNowBtn').addEventListener('click', checkPaymentStatus);
+document.getElementById('paymentPendingClose').addEventListener('click', ()=>{
+  document.getElementById('paymentPendingModal').classList.remove('open');
+  stopPaymentPolling();
+});
+
+document.getElementById('checkoutBtn').addEventListener('click', ()=>{
+  if(cartCount()===0) return;
+  document.getElementById('checkoutModal').classList.add('open');
+});
+document.getElementById('checkoutModalCancel').addEventListener('click', ()=>{
+  document.getElementById('checkoutModal').classList.remove('open');
+});
+document.getElementById('checkoutModalConfirm').addEventListener('click', async ()=>{
+  const name = document.getElementById('coName').value.trim();
+  const phone = document.getElementById('coPhone').value.trim();
+  const address = document.getElementById('coAddress').value.trim();
+  const payMethod = document.querySelector('input[name="payMethod"]:checked').value;
+  const errEl = document.getElementById('checkoutError');
+  errEl.classList.remove('show');
+
+  if(!name || !phone){
+    errEl.textContent = 'Merci de renseigner au moins votre nom et votre téléphone.';
+    errEl.classList.add('show');
+    return;
+  }
+
+  if(payMethod === 'cod'){
+    const confirmBtn = document.getElementById('checkoutModalConfirm');
+    confirmBtn.disabled = true;
+    try{
+      const order = await finalizeOrder(name, phone, address, 'cod', 'n/a');
+      document.getElementById('checkoutModal').classList.remove('open');
+      showToast('Commande ' + order.id + ' enregistrée — paiement à la livraison');
+    }catch(err){
+      errEl.textContent = "Impossible d'enregistrer la commande pour l'instant. Réessayez.";
+      errEl.classList.add('show');
+    }finally{
+      confirmBtn.disabled = false;
+    }
+    return;
+  }
+
+  // Paiement en ligne via CinetPay
+  const confirmBtn = document.getElementById('checkoutModalConfirm');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Ouverture du paiement…';
+
+  try{
+    const order = await finalizeOrder(name, phone, address, 'online', 'pending');
+    const resp = await fetch(`${BACKEND_URL}/api/payment/init`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        amount: order.total,
+        orderId: order.id,
+        customerName: name,
+        customerPhone: phone,
+        description: 'Commande ' + order.id + ' — LeQuel',
+      }),
+    });
+    const data = await resp.json();
+
+    if(!resp.ok || !data.payment_url){
+      throw new Error(data.error || 'Échec de l’initialisation du paiement.');
+    }
+
+    currentPaymentTxn = data.transaction_id;
+
+    window.open(data.payment_url, '_blank');
+
+    document.getElementById('checkoutModal').classList.remove('open');
+    document.getElementById('paymentStatusLine').textContent = 'En attente du paiement…';
+    document.getElementById('paymentStatusLine').style.color = 'var(--encre-soft)';
+    document.getElementById('paymentPendingModal').classList.add('open');
+
+    stopPaymentPolling();
+    paymentPollTimer = setInterval(()=>{
+      paymentPollCount++;
+      if(paymentPollCount > 20){ stopPaymentPolling(); return; }
+      checkPaymentStatus();
+    }, 4000);
+  }catch(err){
+    errEl.textContent = "Impossible de lancer le paiement en ligne pour l'instant. Réessayez, ou choisissez le paiement à la livraison.";
+    errEl.classList.add('show');
+  }finally{
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirmer la commande';
+  }
 });
 document.getElementById('applyPromoBtn').addEventListener('click', applyPromoCode);
 
@@ -1451,10 +1570,14 @@ document.getElementById('pdpBuy').addEventListener('click', ()=>{
 });
 
 // ---------- Admin ----------
-const ADMIN_PASSWORD = 'LeQuel2026';
 const CAT_LABELS = {electronique:'Électronique', mode:'Mode', epicerie:'Épicerie', maison:'Maison'};
 let editingProductId = null;
 let editingPromoCode = null;
+let adminAuthPassword = null;
+
+function adminHeaders(){
+  return {'Content-Type':'application/json', 'x-admin-password': adminAuthPassword};
+}
 
 const adminLoginOverlay = document.getElementById('adminLoginOverlay');
 const adminPanel = document.getElementById('adminPanel');
@@ -1490,13 +1613,28 @@ document.getElementById('adminLoginSubmit').addEventListener('click', submitAdmi
 document.getElementById('adminPassword').addEventListener('keydown', e=>{
   if(e.key === 'Enter') submitAdminLogin();
 });
-function submitAdminLogin(){
+async function submitAdminLogin(){
   const val = document.getElementById('adminPassword').value;
-  if(val === ADMIN_PASSWORD){
-    adminLoginOverlay.classList.remove('open');
-    openAdminPanel();
-  }else{
+  const submitBtn = document.getElementById('adminLoginSubmit');
+  submitBtn.disabled = true;
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/admin/login`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({password: val}),
+    });
+    if(resp.ok){
+      adminAuthPassword = val;
+      adminLoginOverlay.classList.remove('open');
+      openAdminPanel();
+    }else{
+      document.getElementById('adminError').classList.add('show');
+    }
+  }catch(err){
+    document.getElementById('adminError').textContent = 'Connexion au serveur impossible.';
     document.getElementById('adminError').classList.add('show');
+  }finally{
+    submitBtn.disabled = false;
   }
 }
 function openAdminPanel(){
@@ -1509,7 +1647,10 @@ function closeAdminPanel(){
   document.body.style.overflow = '';
 }
 document.getElementById('adminBackSite').addEventListener('click', closeAdminPanel);
-document.getElementById('adminLogout').addEventListener('click', closeAdminPanel);
+document.getElementById('adminLogout').addEventListener('click', ()=>{
+  adminAuthPassword = null;
+  closeAdminPanel();
+});
 
 document.querySelectorAll('.admin-nav-item[data-view]').forEach(btn=>{
   btn.addEventListener('click', ()=> switchAdminView(btn.dataset.view));
@@ -1528,19 +1669,32 @@ function switchAdminView(view){
   if(view === 'promos') renderAdminPromos();
 }
 
-function renderAdminStats(){
-  const total = PRODUCTS.length;
-  const promoCount = PRODUCTS.filter(p=>p.badge==='promo').length;
-  const codesActive = PROMO_CODES.filter(c=>c.active).length;
-  const enCours = ORDERS.filter(o=>o.stage!=='livree' && o.stage!=='annulee').length;
-  const livrees = ORDERS.filter(o=>o.stage==='livree').length;
-  document.getElementById('adminStats').innerHTML = `
-    <div class="stat-card"><div class="n">${total}</div><div class="l">Produits au catalogue</div></div>
-    <div class="stat-card"><div class="n">${promoCount}</div><div class="l">Produits en promotion</div></div>
-    <div class="stat-card"><div class="n">${codesActive}</div><div class="l">Codes promo actifs</div></div>
-    <div class="stat-card"><div class="n">${enCours}</div><div class="l">Commandes en cours</div></div>
-    <div class="stat-card"><div class="n">${livrees}</div><div class="l">Commandes livrées</div></div>
-  `;
+async function renderAdminStats(){
+  const statsEl = document.getElementById('adminStats');
+  statsEl.innerHTML = `<div class="admin-empty">Chargement…</div>`;
+  try{
+    const [promosResp, ordersResp] = await Promise.all([
+      fetch(`${BACKEND_URL}/api/promocodes`, {headers: adminHeaders()}),
+      fetch(`${BACKEND_URL}/api/orders`, {headers: adminHeaders()}),
+    ]);
+    PROMO_CODES = await promosResp.json();
+    ORDERS = await ordersResp.json();
+
+    const total = PRODUCTS.length;
+    const promoCount = PRODUCTS.filter(p=>p.badge==='promo').length;
+    const codesActive = PROMO_CODES.filter(c=>c.active).length;
+    const enCours = ORDERS.filter(o=>o.stage!=='livree' && o.stage!=='annulee').length;
+    const livrees = ORDERS.filter(o=>o.stage==='livree').length;
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="n">${total}</div><div class="l">Produits au catalogue</div></div>
+      <div class="stat-card"><div class="n">${promoCount}</div><div class="l">Produits en promotion</div></div>
+      <div class="stat-card"><div class="n">${codesActive}</div><div class="l">Codes promo actifs</div></div>
+      <div class="stat-card"><div class="n">${enCours}</div><div class="l">Commandes en cours</div></div>
+      <div class="stat-card"><div class="n">${livrees}</div><div class="l">Commandes livrées</div></div>
+    `;
+  }catch(err){
+    statsEl.innerHTML = `<div class="admin-empty">Impossible de charger le tableau de bord.</div>`;
+  }
 }
 
 // ---------- Orders ----------
@@ -1583,14 +1737,32 @@ document.getElementById('orderTabs').addEventListener('click', e=>{
   renderAdminOrders();
 });
 
-function renderAdminOrders(){
+function paymentLabel(o){
+  if(o.paymentMethod === 'online'){
+    if(o.paymentStatus === 'paid') return '<span class="tag-status on">Payé en ligne</span>';
+    if(o.paymentStatus === 'failed') return '<span class="tag-status cancel">Paiement échoué</span>';
+    return '<span class="tag-status off">En attente</span>';
+  }
+  return '<span class="tag-status off">À la livraison</span>';
+}
+
+async function renderAdminOrders(){
   const body = document.getElementById('adminOrdersBody');
+  body.innerHTML = `<tr><td colspan="9"><div class="admin-empty">Chargement…</div></td></tr>`;
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/orders`, {headers: adminHeaders()});
+    ORDERS = await resp.json();
+  }catch(err){
+    body.innerHTML = `<tr><td colspan="9"><div class="admin-empty">Impossible de charger les commandes.</div></td></tr>`;
+    return;
+  }
+
   let list = ORDERS;
   if(currentOrderFilter === 'encours') list = ORDERS.filter(o=>o.stage!=='livree' && o.stage!=='annulee');
   if(currentOrderFilter === 'livrees') list = ORDERS.filter(o=>o.stage==='livree');
 
   if(list.length === 0){
-    body.innerHTML = `<tr><td colspan="8"><div class="admin-empty">Aucune commande ici pour le moment.</div></td></tr>`;
+    body.innerHTML = `<tr><td colspan="9"><div class="admin-empty">Aucune commande ici pour le moment.</div></td></tr>`;
   }else{
     body.innerHTML = list.map(o=>`
       <tr>
@@ -1599,8 +1771,9 @@ function renderAdminOrders(){
         <td>${o.customerPhone}</td>
         <td>${o.items.reduce((s,i)=>s+i.qty,0)} art.</td>
         <td>${fmt(o.total)}</td>
+        <td>${paymentLabel(o)}</td>
         <td><span class="tag-status ${stageBadgeClass(o.stage)}">${stageLabel(o.stage)}</span></td>
-        <td>${o.date.toLocaleDateString('fr-FR')}</td>
+        <td>${new Date(o.date).toLocaleDateString('fr-FR')}</td>
         <td><div class="row-actions"><button class="edit" data-view-order="${o.id}">Gérer</button></div></td>
       </tr>
     `).join('');
@@ -1627,10 +1800,12 @@ function openOrderDetail(id){
   currentOrderId = id;
   const o = ORDERS.find(x=>x.id===id);
   document.getElementById('odTitle').textContent = 'Commande ' + o.id;
+  const d = new Date(o.date);
   document.getElementById('odMeta').innerHTML = `
     <strong>${o.customerName}</strong> · ${o.customerPhone}<br>
     ${o.address ? o.address + '<br>' : ''}
-    ${o.date.toLocaleDateString('fr-FR')} à ${o.date.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
+    ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}<br>
+    Paiement : ${paymentLabel(o)}
     ${o.promoCode ? '<br>Code promo appliqué : ' + o.promoCode : ''}
   `;
   document.getElementById('odStepper').innerHTML = renderStepper(o);
@@ -1643,18 +1818,22 @@ function openOrderDetail(id){
   document.getElementById('orderDetailModal').classList.add('open');
 }
 
-document.getElementById('odSaveStageBtn').addEventListener('click', ()=>{
-  const o = ORDERS.find(x=>x.id===currentOrderId);
-  o.stage = document.getElementById('odStageSelect').value;
+async function updateOrderStage(id, stage){
+  await fetch(`${BACKEND_URL}/api/orders/${id}`, {
+    method:'PATCH',
+    headers: adminHeaders(),
+    body: JSON.stringify({stage}),
+  });
   document.getElementById('orderDetailModal').classList.remove('open');
   renderAdminOrders();
+}
+
+document.getElementById('odSaveStageBtn').addEventListener('click', ()=>{
+  updateOrderStage(currentOrderId, document.getElementById('odStageSelect').value);
 });
 document.getElementById('odCancelOrderBtn').addEventListener('click', ()=>{
   if(confirm('Annuler cette commande ?')){
-    const o = ORDERS.find(x=>x.id===currentOrderId);
-    o.stage = 'annulee';
-    document.getElementById('orderDetailModal').classList.remove('open');
-    renderAdminOrders();
+    updateOrderStage(currentOrderId, 'annulee');
   }
 });
 document.getElementById('orderDetailClose').addEventListener('click', ()=>{
@@ -1692,11 +1871,12 @@ document.getElementById('adminProductsBody').addEventListener('click', e=>{
   if(del){
     const id = Number(del.dataset.delProd);
     if(confirm('Supprimer ce produit du catalogue ?')){
-      const idx = PRODUCTS.findIndex(p=>p.id===id);
-      if(idx > -1) PRODUCTS.splice(idx,1);
-      renderAdminProducts();
-      renderAdminStats();
-      renderGrid();
+      fetch(`${BACKEND_URL}/api/products/${id}`, {method:'DELETE', headers: adminHeaders()})
+        .then(async ()=>{
+          await loadProducts();
+          renderAdminProducts();
+          renderGrid();
+        });
     }
   }
 });
@@ -1749,7 +1929,7 @@ function openProductForm(id){
   productModal.classList.add('open');
 }
 
-document.getElementById('productModalSave').addEventListener('click', ()=>{
+document.getElementById('productModalSave').addEventListener('click', async ()=>{
   const name = document.getElementById('pfName').value.trim();
   const price = Number(document.getElementById('pfPrice').value);
   if(!name || !price){
@@ -1761,22 +1941,41 @@ document.getElementById('productModalSave').addEventListener('click', ()=>{
   const old = Number(document.getElementById('pfOld').value) || null;
   const badge = document.getElementById('pfBadge').value || null;
   const desc = document.getElementById('pfDesc').value.trim();
+  const payload = {cat, catLabel:CAT_LABELS[cat], name, icon, price, old, badge, desc, image:pfImageData};
 
-  if(editingProductId){
-    const p = PRODUCTS.find(x=>x.id===editingProductId);
-    Object.assign(p, {name, cat, catLabel:CAT_LABELS[cat], icon, price, old, badge, desc, image:pfImageData});
-  }else{
-    const newId = Math.max(0, ...PRODUCTS.map(p=>p.id)) + 1;
-    PRODUCTS.push({id:newId, cat, catLabel:CAT_LABELS[cat], name, icon, price, old, rating:5.0, reviews:0, badge, desc, specs:[], image:pfImageData});
+  const saveBtn = document.getElementById('productModalSave');
+  saveBtn.disabled = true;
+  try{
+    if(editingProductId){
+      await fetch(`${BACKEND_URL}/api/products/${editingProductId}`, {
+        method:'PUT', headers: adminHeaders(), body: JSON.stringify(payload),
+      });
+    }else{
+      await fetch(`${BACKEND_URL}/api/products`, {
+        method:'POST', headers: adminHeaders(), body: JSON.stringify(payload),
+      });
+    }
+    productModal.classList.remove('open');
+    await loadProducts();
+    renderAdminProducts();
+    renderGrid();
+  }catch(err){
+    alert("Erreur lors de l'enregistrement du produit. Réessayez.");
+  }finally{
+    saveBtn.disabled = false;
   }
-  productModal.classList.remove('open');
-  renderAdminProducts();
-  renderAdminStats();
-  renderGrid();
 });
 
-function renderAdminPromos(){
+async function renderAdminPromos(){
   const body = document.getElementById('adminPromosBody');
+  body.innerHTML = `<tr><td colspan="4"><div class="admin-empty">Chargement…</div></td></tr>`;
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/promocodes`, {headers: adminHeaders()});
+    PROMO_CODES = await resp.json();
+  }catch(err){
+    body.innerHTML = `<tr><td colspan="4"><div class="admin-empty">Impossible de charger les codes promo.</div></td></tr>`;
+    return;
+  }
   if(PROMO_CODES.length === 0){
     body.innerHTML = `<tr><td colspan="4"><div class="admin-empty">Aucun code promo pour le moment.</div></td></tr>`;
     return;
@@ -1803,10 +2002,8 @@ document.getElementById('adminPromosBody').addEventListener('click', e=>{
   if(del){
     const code = del.dataset.delPromo;
     if(confirm('Supprimer ce code promo ?')){
-      const idx = PROMO_CODES.findIndex(c=>c.code===code);
-      if(idx > -1) PROMO_CODES.splice(idx,1);
-      renderAdminPromos();
-      renderAdminStats();
+      fetch(`${BACKEND_URL}/api/promocodes/${code}`, {method:'DELETE', headers: adminHeaders()})
+        .then(()=> renderAdminPromos());
     }
   }
 });
@@ -1825,7 +2022,7 @@ function openPromoForm(code){
   promoModal.classList.add('open');
 }
 
-document.getElementById('promoModalSave').addEventListener('click', ()=>{
+document.getElementById('promoModalSave').addEventListener('click', async ()=>{
   const code = document.getElementById('prfCode').value.trim().toUpperCase();
   const value = Number(document.getElementById('prfValue').value);
   const active = document.getElementById('prfActive').checked;
@@ -1833,23 +2030,30 @@ document.getElementById('promoModalSave').addEventListener('click', ()=>{
     alert('Merci de renseigner un code et un pourcentage de réduction.');
     return;
   }
-  if(editingPromoCode){
-    const c = PROMO_CODES.find(x=>x.code===editingPromoCode);
-    Object.assign(c, {code, value, active});
-  }else{
-    if(PROMO_CODES.find(x=>x.code===code)){
-      alert('Ce code existe déjà.');
-      return;
+  try{
+    if(editingPromoCode){
+      const resp = await fetch(`${BACKEND_URL}/api/promocodes/${editingPromoCode}`, {
+        method:'PUT', headers: adminHeaders(), body: JSON.stringify({value, active}),
+      });
+      if(!resp.ok) throw new Error();
+    }else{
+      const resp = await fetch(`${BACKEND_URL}/api/promocodes`, {
+        method:'POST', headers: adminHeaders(), body: JSON.stringify({code, value, active}),
+      });
+      if(!resp.ok){
+        const data = await resp.json();
+        alert(data.error || 'Ce code existe déjà.');
+        return;
+      }
     }
-    PROMO_CODES.push({code, value, active});
+    promoModal.classList.remove('open');
+    renderAdminPromos();
+  }catch(err){
+    alert("Erreur lors de l'enregistrement du code promo. Réessayez.");
   }
-  promoModal.classList.remove('open');
-  renderAdminPromos();
-  renderAdminStats();
 });
 
-// ---------- Customer accounts (prototype — see notes) ----------
-const ACCOUNTS = [];
+// ---------- Customer accounts ----------
 let currentUser = null;
 
 const authModal = document.getElementById('authModal');
@@ -1884,7 +2088,7 @@ function updateAccountIcon(){
   document.getElementById('accountIconBtn').classList.toggle('logged-in', !!currentUser);
 }
 
-document.getElementById('signupSubmitBtn').addEventListener('click', ()=>{
+document.getElementById('signupSubmitBtn').addEventListener('click', async ()=>{
   const name = document.getElementById('signupName').value.trim();
   const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const password = document.getElementById('signupPassword').value;
@@ -1901,39 +2105,66 @@ document.getElementById('signupSubmitBtn').addEventListener('click', ()=>{
     errEl.classList.add('show');
     return;
   }
-  if(ACCOUNTS.find(a=>a.email === email)){
-    errEl.textContent = 'Un compte existe déjà avec cet e-mail.';
+
+  const btn = document.getElementById('signupSubmitBtn');
+  btn.disabled = true;
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/accounts/signup`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, email, password}),
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      errEl.textContent = data.error || "Impossible de créer le compte.";
+      errEl.classList.add('show');
+      return;
+    }
+    currentUser = {name:data.name, email:data.email};
+    authModal.classList.remove('open');
+    showToast('Compte créé — bienvenue ' + name + ' !');
+    document.getElementById('signupName').value = '';
+    document.getElementById('signupEmail').value = '';
+    document.getElementById('signupPassword').value = '';
+    updateAccountIcon();
+  }catch(err){
+    errEl.textContent = "Connexion au serveur impossible pour l'instant.";
     errEl.classList.add('show');
-    return;
+  }finally{
+    btn.disabled = false;
   }
-  ACCOUNTS.push({name, email, password});
-  currentUser = {name, email};
-  authModal.classList.remove('open');
-  showToast('Compte créé — bienvenue ' + name + ' !');
-  document.getElementById('signupName').value = '';
-  document.getElementById('signupEmail').value = '';
-  document.getElementById('signupPassword').value = '';
-  updateAccountIcon();
 });
 
-document.getElementById('loginSubmitBtn').addEventListener('click', ()=>{
+document.getElementById('loginSubmitBtn').addEventListener('click', async ()=>{
   const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   const password = document.getElementById('loginPassword').value;
   const errEl = document.getElementById('loginError');
   errEl.classList.remove('show');
 
-  const acc = ACCOUNTS.find(a=>a.email === email && a.password === password);
-  if(!acc){
-    errEl.textContent = 'E-mail ou mot de passe incorrect.';
+  const btn = document.getElementById('loginSubmitBtn');
+  btn.disabled = true;
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/accounts/login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email, password}),
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      errEl.textContent = data.error || 'E-mail ou mot de passe incorrect.';
+      errEl.classList.add('show');
+      return;
+    }
+    currentUser = {name:data.name, email:data.email};
+    authModal.classList.remove('open');
+    showToast('Connecté — bon retour ' + data.name + ' !');
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    updateAccountIcon();
+  }catch(err){
+    errEl.textContent = "Connexion au serveur impossible pour l'instant.";
     errEl.classList.add('show');
-    return;
+  }finally{
+    btn.disabled = false;
   }
-  currentUser = {name:acc.name, email:acc.email};
-  authModal.classList.remove('open');
-  showToast('Connecté — bon retour ' + acc.name + ' !');
-  document.getElementById('loginEmail').value = '';
-  document.getElementById('loginPassword').value = '';
-  updateAccountIcon();
 });
 
 document.getElementById('logoutBtn').addEventListener('click', ()=>{
@@ -1942,7 +2173,20 @@ document.getElementById('logoutBtn').addEventListener('click', ()=>{
   updateAccountIcon();
 });
 
-renderGrid();
+async function loadProducts(){
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/products`);
+    if(!resp.ok) throw new Error();
+    PRODUCTS = await resp.json();
+  }catch(err){
+    grid.innerHTML = `<div class="cat-page-empty">Impossible de charger les produits pour l'instant. Vérifiez votre connexion et réessayez.</div>`;
+    return;
+  }
+  renderGrid();
+}
+
+grid.innerHTML = `<div class="cat-page-empty">Chargement des produits…</div>`;
+loadProducts();
 updateCartUI();
 
 if('serviceWorker' in navigator){
