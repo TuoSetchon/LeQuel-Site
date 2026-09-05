@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lequel-v1';
+const CACHE_NAME = 'lequel-v2';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -22,20 +22,19 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+// Network-first: always tries to fetch the latest version online.
+// Falls back to the cached copy only when there's no connection.
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const network = fetch(event.request)
-        .then(response => {
-          if (response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request)
+      .then(response => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
