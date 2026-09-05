@@ -1,7 +1,7 @@
 {
   "name": "lequel-backend",
-  "version": "1.0.0",
-  "description": "Backend de paiement LeQuel (intégration CinetPay)",
+  "version": "2.0.0",
+  "description": "Backend LeQuel — produits, commandes, comptes, codes promo et paiement CinetPay",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,6 +9,8 @@
   "dependencies": {
     "express": "^4.19.2",
     "cors": "^2.8.5",
-    "axios": "^1.7.2"
+    "axios": "^1.7.2",
+    "pg": "^8.12.0",
+    "bcryptjs": "^2.4.3"
   }
 }
