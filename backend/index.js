@@ -2,11 +2,20 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { pool, migrate } = require('./db');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    console.log(`${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - start}ms)`);
+  });
+  next();
+});
 
 const CINETPAY_API_KEY = process.env.CINETPAY_API_KEY;
 const CINETPAY_SITE_ID = process.env.CINETPAY_SITE_ID;
@@ -240,6 +249,57 @@ app.post('/api/accounts/login', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Erreur lors de la connexion." });
+  }
+});
+
+app.post('/api/accounts/forgot-password', async (req, res) => {
+  try {
+    const email = (req.body.email || '').toLowerCase();
+    const { rows } = await pool.query('SELECT * FROM lequel_accounts WHERE email=$1', [email]);
+    const account = rows[0];
+    if (!account) {
+      return res.status(404).json({ error: 'Aucun compte ne correspond à cet e-mail.' });
+    }
+
+    const token = crypto.randomBytes(24).toString('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 heure
+    await pool.query(
+      'UPDATE lequel_accounts SET reset_token=$1, reset_token_expires=$2 WHERE id=$3',
+      [token, expires, account.id]
+    );
+
+    const resetLink = `${APP_URL}/?reset=1&token=${token}`;
+    res.json({ resetLink });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de la demande de réinitialisation." });
+  }
+});
+
+app.post('/api/accounts/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'Lien invalide ou mot de passe trop court (6 caractères minimum).' });
+    }
+    const { rows } = await pool.query(
+      'SELECT * FROM lequel_accounts WHERE reset_token=$1 AND reset_token_expires > now()',
+      [token]
+    );
+    const account = rows[0];
+    if (!account) {
+      return res.status(400).json({ error: 'Ce lien a expiré ou est invalide. Refaites une demande.' });
+    }
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      'UPDATE lequel_accounts SET password_hash=$1, reset_token=NULL, reset_token_expires=NULL WHERE id=$2',
+      [hash, account.id]
+    );
+    res.json({ ok: true, name: account.name, email: account.email });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de la réinitialisation du mot de passe." });
   }
 });
 
