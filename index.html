@@ -614,6 +614,13 @@
   }
   .form-save:hover{background:var(--rouge-dark);}
   .form-hint{font-size:11.5px;color:var(--encre-soft);margin-top:6px;}
+  .send-link-row{display:flex;gap:8px;}
+  .send-link-btn{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+    padding:11px 0;border-radius:10px;font-size:13px;font-weight:700;color:#fff;
+  }
+  .send-link-btn.whatsapp{background:#25D366;}
+  .send-link-btn.sms{background:var(--encre);}
   .pay-options{display:flex;flex-direction:column;gap:10px;}
   .pay-option{
     display:flex;align-items:center;gap:10px;
@@ -654,6 +661,21 @@
   .image-remove-btn{
     font-size:12px;color:var(--encre-soft);text-decoration:underline;
     background:none;border:none;padding:0;
+  }
+  .crop-viewport{
+    width:100%;aspect-ratio:1/1;max-width:300px;margin:0 auto;
+    border-radius:12px;overflow:hidden;position:relative;
+    background:#111;touch-action:none;cursor:grab;
+  }
+  .crop-viewport:active{cursor:grabbing;}
+  .crop-viewport img{
+    position:absolute;top:0;left:0;
+    max-width:none;max-height:none;
+    user-select:none;-webkit-user-drag:none;
+  }
+  .crop-viewport::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    border:2px solid rgba(255,255,255,.6);border-radius:12px;
   }
 
   @media(max-width:760px){
@@ -949,7 +971,8 @@
           <button type="button" id="pfImageRemove" class="image-remove-btn">Retirer la photo</button>
         </div>
       </div>
-      <p class="form-hint">JPG ou PNG, idéalement carrée. Sans photo, l'icône ci-dessous est utilisée.</p>
+      <p class="form-hint">JPG ou PNG, 8 Mo maximum. Vous pourrez recadrer la photo après l'avoir choisie.</p>
+      <p class="form-hint" id="pfImageSizeInfo"></p>
     </div>
     <div class="form-grid-2">
       <div class="form-row">
@@ -1013,6 +1036,25 @@
     <div class="form-actions">
       <button class="form-cancel" id="promoModalCancel">Annuler</button>
       <button class="form-save" id="promoModalSave">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image crop modal -->
+<div class="modal-overlay" id="cropModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h3>Recadrer la photo</h3>
+    <p class="form-hint" style="margin-bottom:14px;">Faites glisser l'image pour la repositionner, utilisez le curseur pour zoomer.</p>
+    <div class="crop-viewport" id="cropViewport">
+      <img id="cropImage" alt="" draggable="false">
+    </div>
+    <div class="form-row" style="margin-top:16px;">
+      <label>Zoom</label>
+      <input type="range" id="cropZoom" min="100" max="300" value="100" style="width:100%;">
+    </div>
+    <div class="form-actions">
+      <button class="form-cancel" id="cropCancel">Annuler</button>
+      <button class="form-save" id="cropConfirm">Valider le recadrage</button>
     </div>
   </div>
 </div>
@@ -1112,6 +1154,7 @@
       </div>
       <div class="admin-error" id="loginError">E-mail ou mot de passe incorrect.</div>
       <button class="form-save" id="loginSubmitBtn" style="width:100%;">Se connecter</button>
+      <button type="button" id="forgotPasswordLink" style="width:100%;margin-top:12px;background:none;border:none;color:var(--rouge);font-size:12.5px;font-weight:600;text-decoration:underline;">Mot de passe oublié ?</button>
     </div>
 
     <div id="authViewSignup" style="display:none;">
@@ -1142,6 +1185,57 @@
     <p id="accountInfo" style="font-size:13.5px;color:var(--encre-soft);margin:14px 0 22px;line-height:1.6;"></p>
     <button class="form-save" id="logoutBtn" style="width:100%;background:var(--rouge);">Se déconnecter</button>
     <button class="form-cancel" id="accountModalClose" style="width:100%;margin-top:10px;">Fermer</button>
+  </div>
+</div>
+
+<!-- Forgot password: request modal -->
+<div class="modal-overlay" id="forgotModal">
+  <div class="modal-box">
+    <h3>Mot de passe oublié</h3>
+    <p class="form-hint" style="margin-bottom:16px;">Indiquez l'e-mail de votre compte. Un lien de réinitialisation valable 1 heure sera généré.</p>
+    <div class="form-row">
+      <label>E-mail</label>
+      <input type="email" id="forgotEmail" placeholder="vous@exemple.com">
+    </div>
+    <div class="admin-error" id="forgotError"></div>
+    <div id="forgotResultBox" style="display:none;background:var(--creme);border-radius:10px;padding:14px;margin-bottom:16px;">
+      <p style="font-size:12.5px;color:var(--encre-soft);margin-bottom:10px;">Lien de réinitialisation généré (valable 1h) :</p>
+      <div class="send-link-row">
+        <button type="button" id="forgotSendWhatsapp" class="send-link-btn whatsapp">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm0 18.15h-.01a8.22 8.22 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.42a8.19 8.19 0 0 1 2.41 5.83c0 4.55-3.7 8.23-8.24 8.23Zm4.52-6.17c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.13-.17.24-.64.8-.78.97-.14.16-.29.18-.53.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.24-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.16-.24.24-.4.08-.17.04-.31-.02-.43-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.16 0-.43.06-.66.31-.22.24-.87.85-.87 2.08 0 1.22.89 2.4 1.01 2.57.13.16 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.1-.22-.16-.47-.28Z"/></svg>
+          WhatsApp
+        </button>
+        <button type="button" id="forgotSendSms" class="send-link-btn sms">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          SMS
+        </button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input type="text" id="forgotResultLink" readonly style="flex:1;padding:9px 11px;border:1px solid var(--ligne);border-radius:8px;font-size:12px;">
+        <button type="button" id="forgotCopyBtn" style="padding:0 14px;border-radius:8px;background:var(--encre);color:#fff;font-size:12px;font-weight:700;">Copier</button>
+      </div>
+      <p class="form-hint" style="margin-top:8px;">Choisissez WhatsApp ou SMS pour l'envoyer directement à un contact, ou copiez le lien.</p>
+    </div>
+    <div class="form-actions">
+      <button class="form-cancel" id="forgotCancel">Fermer</button>
+      <button class="form-save" id="forgotSubmit">Générer le lien</button>
+    </div>
+  </div>
+</div>
+
+<!-- Forgot password: set new password modal -->
+<div class="modal-overlay" id="resetModal">
+  <div class="modal-box">
+    <h3>Nouveau mot de passe</h3>
+    <div class="form-row">
+      <label>Nouveau mot de passe</label>
+      <input type="password" id="resetNewPassword" placeholder="6 caractères minimum">
+    </div>
+    <div class="admin-error" id="resetError"></div>
+    <div class="form-actions">
+      <button class="form-cancel" id="resetCancel">Annuler</button>
+      <button class="form-save" id="resetSubmit">Valider</button>
+    </div>
   </div>
 </div>
 
@@ -1872,11 +1966,13 @@ document.getElementById('adminProductsBody').addEventListener('click', e=>{
     const id = Number(del.dataset.delProd);
     if(confirm('Supprimer ce produit du catalogue ?')){
       fetch(`${BACKEND_URL}/api/products/${id}`, {method:'DELETE', headers: adminHeaders()})
-        .then(async ()=>{
+        .then(async resp=>{
+          if(!resp.ok) alert('Erreur : la suppression a échoué sur le serveur.');
           await loadProducts();
           renderAdminProducts();
           renderGrid();
-        });
+        })
+        .catch(()=> alert('Connexion au serveur impossible — suppression non effectuée.'));
     }
   }
 });
@@ -1896,20 +1992,115 @@ function setImagePreview(src, iconFallback){
   }
 }
 
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8 Mo
+
+function updateImageSizeInfo(dataUrl){
+  const el = document.getElementById('pfImageSizeInfo');
+  if(!dataUrl){ el.textContent = ''; return; }
+  const base64 = dataUrl.split(',')[1] || '';
+  const bytes = Math.round(base64.length * 0.75);
+  const ko = Math.round(bytes / 1024);
+  el.textContent = `Taille de la photo après recadrage : ~${ko} Ko`;
+}
+
+// ---------- Crop modal ----------
+const cropModal = document.getElementById('cropModal');
+const cropViewport = document.getElementById('cropViewport');
+const cropImageEl = document.getElementById('cropImage');
+const cropZoomInput = document.getElementById('cropZoom');
+const CROP_VIEWPORT_SIZE = 300;
+const CROP_OUTPUT_SIZE = 700;
+
+let cropNaturalW = 0, cropNaturalH = 0, cropBaseScale = 1;
+let cropOffsetX = 0, cropOffsetY = 0;
+let cropDragging = false, cropDragStartX = 0, cropDragStartY = 0, cropStartOffsetX = 0, cropStartOffsetY = 0;
+
+function applyCropTransform(){
+  const zoomFactor = Number(cropZoomInput.value) / 100;
+  const scale = cropBaseScale * zoomFactor;
+  const dw = cropNaturalW * scale, dh = cropNaturalH * scale;
+  cropOffsetX = Math.min(0, Math.max(CROP_VIEWPORT_SIZE - dw, cropOffsetX));
+  cropOffsetY = Math.min(0, Math.max(CROP_VIEWPORT_SIZE - dh, cropOffsetY));
+  cropImageEl.style.width = dw + 'px';
+  cropImageEl.style.height = dh + 'px';
+  cropImageEl.style.transform = `translate(${cropOffsetX}px, ${cropOffsetY}px)`;
+}
+
+function openCropModal(dataUrl){
+  const img = new Image();
+  img.onload = ()=>{
+    cropNaturalW = img.width;
+    cropNaturalH = img.height;
+    cropBaseScale = Math.max(CROP_VIEWPORT_SIZE / cropNaturalW, CROP_VIEWPORT_SIZE / cropNaturalH);
+    cropOffsetX = (CROP_VIEWPORT_SIZE - cropNaturalW * cropBaseScale) / 2;
+    cropOffsetY = (CROP_VIEWPORT_SIZE - cropNaturalH * cropBaseScale) / 2;
+    cropZoomInput.value = 100;
+    cropImageEl.src = dataUrl;
+    applyCropTransform();
+    cropModal.classList.add('open');
+  };
+  img.src = dataUrl;
+}
+
+cropZoomInput.addEventListener('input', applyCropTransform);
+
+cropViewport.addEventListener('pointerdown', e=>{
+  cropDragging = true;
+  cropDragStartX = e.clientX; cropDragStartY = e.clientY;
+  cropStartOffsetX = cropOffsetX; cropStartOffsetY = cropOffsetY;
+  cropViewport.setPointerCapture(e.pointerId);
+});
+cropViewport.addEventListener('pointermove', e=>{
+  if(!cropDragging) return;
+  cropOffsetX = cropStartOffsetX + (e.clientX - cropDragStartX);
+  cropOffsetY = cropStartOffsetY + (e.clientY - cropDragStartY);
+  applyCropTransform();
+});
+cropViewport.addEventListener('pointerup', ()=>{ cropDragging = false; });
+cropViewport.addEventListener('pointercancel', ()=>{ cropDragging = false; });
+
+document.getElementById('cropCancel').addEventListener('click', ()=>{
+  cropModal.classList.remove('open');
+  document.getElementById('pfImageInput').value = '';
+});
+
+document.getElementById('cropConfirm').addEventListener('click', ()=>{
+  const zoomFactor = Number(cropZoomInput.value) / 100;
+  const scale = cropBaseScale * zoomFactor;
+  const ratio = CROP_OUTPUT_SIZE / CROP_VIEWPORT_SIZE;
+  const canvas = document.createElement('canvas');
+  canvas.width = CROP_OUTPUT_SIZE;
+  canvas.height = CROP_OUTPUT_SIZE;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(
+    cropImageEl,
+    cropOffsetX * ratio, cropOffsetY * ratio,
+    cropNaturalW * scale * ratio, cropNaturalH * scale * ratio
+  );
+  pfImageData = canvas.toDataURL('image/jpeg', 0.8);
+  setImagePreview(pfImageData);
+  updateImageSizeInfo(pfImageData);
+  cropModal.classList.remove('open');
+});
+
 document.getElementById('pfImageInput').addEventListener('change', e=>{
   const file = e.target.files[0];
   if(!file) return;
+  if(file.size > MAX_UPLOAD_BYTES){
+    alert(`Cette photo dépasse la limite de 8 Mo (elle fait ${(file.size/1024/1024).toFixed(1)} Mo). Choisissez une photo plus légère.`);
+    e.target.value = '';
+    return;
+  }
   const reader = new FileReader();
-  reader.onload = ev=>{
-    pfImageData = ev.target.result;
-    setImagePreview(pfImageData);
-  };
+  reader.onload = ev => openCropModal(ev.target.result);
+  reader.onerror = () => alert("Impossible de lire cette image. Essayez-en une autre.");
   reader.readAsDataURL(file);
 });
 document.getElementById('pfImageRemove').addEventListener('click', ()=>{
   pfImageData = null;
   document.getElementById('pfImageInput').value = '';
   setImagePreview(null, document.getElementById('pfIcon').value.trim() || '📦');
+  updateImageSizeInfo(null);
 });
 
 function openProductForm(id){
@@ -1926,6 +2117,7 @@ function openProductForm(id){
   document.getElementById('pfImageInput').value = '';
   pfImageData = p && p.image ? p.image : null;
   setImagePreview(pfImageData, p ? p.icon : '📦');
+  updateImageSizeInfo(pfImageData);
   productModal.classList.add('open');
 }
 
@@ -1945,24 +2137,31 @@ document.getElementById('productModalSave').addEventListener('click', async ()=>
 
   const saveBtn = document.getElementById('productModalSave');
   saveBtn.disabled = true;
+  saveBtn.textContent = 'Enregistrement…';
   try{
+    let resp;
     if(editingProductId){
-      await fetch(`${BACKEND_URL}/api/products/${editingProductId}`, {
+      resp = await fetch(`${BACKEND_URL}/api/products/${editingProductId}`, {
         method:'PUT', headers: adminHeaders(), body: JSON.stringify(payload),
       });
     }else{
-      await fetch(`${BACKEND_URL}/api/products`, {
+      resp = await fetch(`${BACKEND_URL}/api/products`, {
         method:'POST', headers: adminHeaders(), body: JSON.stringify(payload),
       });
+    }
+    if(!resp.ok){
+      const data = await resp.json().catch(()=>({}));
+      throw new Error(data.error || `Le serveur a refusé l'enregistrement (code ${resp.status}).`);
     }
     productModal.classList.remove('open');
     await loadProducts();
     renderAdminProducts();
     renderGrid();
   }catch(err){
-    alert("Erreur lors de l'enregistrement du produit. Réessayez.");
+    alert("Erreur lors de l'enregistrement du produit : " + err.message + "\nLe produit n'a PAS été sauvegardé, réessayez.");
   }finally{
     saveBtn.disabled = false;
+    saveBtn.textContent = 'Enregistrer';
   }
 });
 
@@ -2173,27 +2372,117 @@ document.getElementById('logoutBtn').addEventListener('click', ()=>{
   updateAccountIcon();
 });
 
-async function loadProducts(){
-  try{
-    const resp = await fetch(`${BACKEND_URL}/api/products`);
-    if(!resp.ok) throw new Error();
-    PRODUCTS = await resp.json();
-  }catch(err){
-    grid.innerHTML = `<div class="cat-page-empty">Impossible de charger les produits pour l'instant. Vérifiez votre connexion et réessayez.</div>`;
+// ---------- Forgot / reset password ----------
+const forgotModal = document.getElementById('forgotModal');
+const resetModal = document.getElementById('resetModal');
+
+document.getElementById('forgotPasswordLink').addEventListener('click', ()=>{
+  authModal.classList.remove('open');
+  document.getElementById('forgotEmail').value = '';
+  document.getElementById('forgotError').classList.remove('show');
+  document.getElementById('forgotResultBox').style.display = 'none';
+  forgotModal.classList.add('open');
+});
+document.getElementById('forgotCancel').addEventListener('click', ()=>{
+  forgotModal.classList.remove('open');
+});
+
+document.getElementById('forgotSubmit').addEventListener('click', async ()=>{
+  const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+  const errEl = document.getElementById('forgotError');
+  errEl.classList.remove('show');
+  if(!email){
+    errEl.textContent = 'Merci de renseigner votre e-mail.';
+    errEl.classList.add('show');
     return;
   }
-  renderGrid();
-}
+  const btn = document.getElementById('forgotSubmit');
+  btn.disabled = true;
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/accounts/forgot-password`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email}),
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      errEl.textContent = data.error || "Impossible de générer le lien.";
+      errEl.classList.add('show');
+      return;
+    }
+    document.getElementById('forgotResultLink').value = data.resetLink;
+    document.getElementById('forgotResultBox').style.display = 'block';
+  }catch(err){
+    errEl.textContent = "Connexion au serveur impossible pour l'instant.";
+    errEl.classList.add('show');
+  }finally{
+    btn.disabled = false;
+  }
+});
 
-grid.innerHTML = `<div class="cat-page-empty">Chargement des produits…</div>`;
-loadProducts();
-updateCartUI();
-
-if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+document.getElementById('forgotCopyBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('forgotResultLink');
+  input.select();
+  navigator.clipboard.writeText(input.value).then(()=>{
+    showToast('Lien copié !');
+  }).catch(()=>{
+    document.execCommand('copy');
   });
-}
-</script>
-</body>
-</html>
+});
+
+document.getElementById('forgotSendWhatsapp').addEventListener('click', ()=>{
+  const link = document.getElementById('forgotResultLink').value;
+  const message = `Voici votre lien pour créer un nouveau mot de passe sur LeQuel (valable 1 heure) : ${link}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+});
+
+document.getElementById('forgotSendSms').addEventListener('click', ()=>{
+  const link = document.getElementById('forgotResultLink').value;
+  const message = `Votre lien pour créer un nouveau mot de passe sur LeQuel (valable 1h) : ${link}`;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  window.location.href = `sms:${isIOS ? '&' : '?'}body=${encodeURIComponent(message)}`;
+});
+
+let resetToken = null;
+document.getElementById('resetCancel').addEventListener('click', ()=>{
+  resetModal.classList.remove('open');
+});
+document.getElementById('resetSubmit').addEventListener('click', async ()=>{
+  const newPassword = document.getElementById('resetNewPassword').value;
+  const errEl = document.getElementById('resetError');
+  errEl.classList.remove('show');
+  if(!newPassword || newPassword.length < 6){
+    errEl.textContent = 'Le mot de passe doit contenir au moins 6 caractères.';
+    errEl.classList.add('show');
+    return;
+  }
+  const btn = document.getElementById('resetSubmit');
+  btn.disabled = true;
+  try{
+    const resp = await fetch(`${BACKEND_URL}/api/accounts/reset-password`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({token: resetToken, newPassword}),
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      errEl.textContent = data.error || "Impossible de réinitialiser le mot de passe.";
+      errEl.classList.add('show');
+      return;
+    }
+    resetModal.classList.remove('open');
+    showToast('Mot de passe mis à jour — vous pouvez vous connecter.');
+    document.getElementById('loginEmail').value = data.email;
+    authModal.classList.add('open');
+  }catch(err){
+    errEl.textContent = "Connexion au serveur impossible pour l'instant.";
+    errEl.classList.add('show');
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+// Auto-open the reset form if the page was opened via a reset link
+{
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('reset') === '1' && params.get('token')){
+    resetToken = params.get('token');
+  
