@@ -400,6 +400,26 @@
   }
   .btn-solid:hover{background:var(--rouge-dark);}
 
+  /* ---------- category window overlay ---------- */
+  .cat-page{
+    position:fixed;inset:0;background:#fff;z-index:75;
+    overflow-y:auto;
+    transform:translateY(100%);transition:transform .28s ease;
+  }
+  .cat-page.open{transform:translateY(0);}
+  .cat-page-top{
+    position:sticky;top:0;background:#fff;z-index:2;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 18px;border-bottom:1px solid var(--ligne);
+  }
+  .cat-page-top button{
+    width:34px;height:34px;border-radius:50%;background:var(--creme);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .cat-page-top h2{font-size:16px;}
+  .cat-page-body{padding:18px 20px 40px;max-width:1080px;margin:0 auto;}
+  .cat-page-empty{padding:60px 20px;text-align:center;color:var(--encre-soft);font-size:14px;}
+
   .toast{
     position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);
     background:var(--encre);color:#fff;font-size:13.5px;font-weight:600;
@@ -806,6 +826,20 @@
 
 <div class="toast" id="toast">Ajouté au panier</div>
 
+<!-- Category window -->
+<div class="cat-page" id="catPage">
+  <div class="cat-page-top">
+    <button id="catPageClose" aria-label="Retour">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+    <h2 id="catPageTitle">Catégorie</h2>
+    <span style="width:34px"></span>
+  </div>
+  <div class="cat-page-body">
+    <div class="grid" id="catPageGrid"></div>
+  </div>
+</div>
+
 <!-- Admin login -->
 <div class="admin-login-overlay" id="adminLoginOverlay">
   <div class="admin-login-card">
@@ -1145,10 +1179,11 @@ const ORDERS = [
 ];
 
 const grid = document.getElementById('productGrid');
+const catPage = document.getElementById('catPage');
+const catPageGrid = document.getElementById('catPageGrid');
 
-function renderGrid(){
-  const list = activeCat === 'tous' ? PRODUCTS : PRODUCTS.filter(p => p.cat === activeCat);
-  grid.innerHTML = list.map(p => `
+function cardHTML(p){
+  return `
     <div class="card" data-id="${p.id}">
       <div class="card-media">
         ${p.badge === 'promo' ? '<span class="ribbon promo">PROMO</span>' : ''}
@@ -1168,7 +1203,12 @@ function renderGrid(){
         <button class="add-btn" data-add="${p.id}">Ajouter au panier</button>
       </div>
     </div>
-  `).join('');
+  `;
+}
+
+function renderGrid(){
+  const list = activeCat === 'tous' ? PRODUCTS : PRODUCTS.filter(p => p.cat === activeCat);
+  grid.innerHTML = list.map(cardHTML).join('');
 }
 
 document.getElementById('catNav').addEventListener('click', e=>{
@@ -1180,19 +1220,27 @@ document.getElementById('catNav').addEventListener('click', e=>{
   renderGrid();
 });
 
+function openCategoryPage(cat){
+  const label = CAT_LABELS[cat] || 'Tous les produits';
+  document.getElementById('catPageTitle').textContent = label;
+  const list = PRODUCTS.filter(p => p.cat === cat);
+  catPageGrid.innerHTML = list.length
+    ? list.map(cardHTML).join('')
+    : `<div class="cat-page-empty">Aucun produit dans cette catégorie pour le moment.</div>`;
+  catPage.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeCategoryPage(){
+  catPage.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.getElementById('catPageClose').addEventListener('click', closeCategoryPage);
+
 document.querySelectorAll('.cat-card').forEach(c=>{
-  c.addEventListener('click', ()=>{
-    const cat = c.dataset.cat;
-    document.querySelectorAll('.cat-chip').forEach(ch=>{
-      ch.classList.toggle('active', ch.dataset.cat === cat);
-    });
-    activeCat = cat;
-    renderGrid();
-    document.getElementById('produits').scrollIntoView({behavior:'smooth'});
-  });
+  c.addEventListener('click', ()=> openCategoryPage(c.dataset.cat));
 });
 
-grid.addEventListener('click', e=>{
+function handleProductGridClick(e){
   const addBtn = e.target.closest('[data-add]');
   if(addBtn){
     addToCart(Number(addBtn.dataset.add), 1);
@@ -1200,7 +1248,9 @@ grid.addEventListener('click', e=>{
   }
   const card = e.target.closest('.card');
   if(card) openPdp(Number(card.dataset.id));
-});
+}
+grid.addEventListener('click', handleProductGridClick);
+catPageGrid.addEventListener('click', handleProductGridClick);
 
 function addToCart(id, qty){
   cart[id] = (cart[id]||0) + qty;
