@@ -255,6 +255,10 @@
     margin-top:50px;
     background:var(--encre);color:#EADFD1;
     padding:40px 20px 24px;
+    -webkit-user-select:none;user-select:none;
+  }
+  button,.icon-btn,.cat-chip,.add-btn,.form-save,.form-cancel,.btn-solid,.btn-ghost{
+    touch-action:manipulation;
   }
   .foot-grid{
     max-width:1080px;margin:0 auto;
@@ -783,7 +787,7 @@
     </div>
   </div>
   <div class="foot-bottom">
-    <span id="secretAdminTrigger" style="cursor:default;">© 2026 LeQuel. Tous droits réservés.</span>
+    <span id="secretAdminTrigger" style="cursor:default;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;">© 2026 LeQuel. Tous droits réservés.</span>
     <span>Conditions générales · Confidentialité</span>
   </div>
 </footer>
@@ -1683,18 +1687,26 @@ function openAdminLoginPrompt(){
   document.getElementById('adminPassword').focus();
 }
 
-// Discreet access #1: tap "© 2026 LeQuel" 5 times within 3s
-let secretTapCount = 0;
-let secretTapTimer = null;
-document.getElementById('secretAdminTrigger').addEventListener('click', ()=>{
-  secretTapCount++;
-  clearTimeout(secretTapTimer);
-  secretTapTimer = setTimeout(()=>{ secretTapCount = 0; }, 3000);
-  if(secretTapCount >= 5){
-    secretTapCount = 0;
-    openAdminLoginPrompt();
-  }
-});
+// Discreet access #1: press and hold "© 2026 LeQuel" for 1.5s
+{
+  const trigger = document.getElementById('secretAdminTrigger');
+  let pressTimer = null;
+  const startPress = e => {
+    e.preventDefault();
+    pressTimer = setTimeout(()=>{
+      pressTimer = null;
+      openAdminLoginPrompt();
+    }, 1500);
+  };
+  const cancelPress = () => {
+    if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; }
+  };
+  trigger.addEventListener('pointerdown', startPress);
+  trigger.addEventListener('pointerup', cancelPress);
+  trigger.addEventListener('pointerleave', cancelPress);
+  trigger.addEventListener('pointercancel', cancelPress);
+  trigger.addEventListener('contextmenu', e => e.preventDefault());
+}
 
 // Discreet access #2: open the site with ?admin=1 in the address bar
 if(new URLSearchParams(window.location.search).get('admin') === '1'){
@@ -2469,20 +2481,4 @@ document.getElementById('resetSubmit').addEventListener('click', async ()=>{
       return;
     }
     resetModal.classList.remove('open');
-    showToast('Mot de passe mis à jour — vous pouvez vous connecter.');
-    document.getElementById('loginEmail').value = data.email;
-    authModal.classList.add('open');
-  }catch(err){
-    errEl.textContent = "Connexion au serveur impossible pour l'instant.";
-    errEl.classList.add('show');
-  }finally{
-    btn.disabled = false;
-  }
-});
-
-// Auto-open the reset form if the page was opened via a reset link
-{
-  const params = new URLSearchParams(window.location.search);
-  if(params.get('reset') === '1' && params.get('token')){
-    resetToken = params.get('token');
-  
+    showToast('Mot 
